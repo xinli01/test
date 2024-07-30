@@ -21,18 +21,18 @@ import java.util.concurrent.TimeUnit;
 
 public class Main5 {
 
-    public class User{
+    public class Patient {
         int id;
 
-        public User(int id) {
+        public Patient(int id) {
             this.id = id;
         }
     }
 
-    public class Referee {
+    public class Doctor {
         int id;
         Instant instantAddedToQue;
-        public Referee(int id) {
+        public Doctor(int id) {
             this.id = id;
         }
         public void setTime() {
@@ -41,26 +41,26 @@ public class Main5 {
     }
 
     public void simulate() throws InterruptedException {
-        List<User> userList = new ArrayList<>(
-                List.of(new User(1), new User(2), new User(3), new User(4), new User(5), new User(6)));
+        List<Patient> patientList = new ArrayList<>(
+                List.of(new Patient(1), new Patient(2), new Patient(3), new Patient(4), new Patient(5), new Patient(6)));
 
-        List<Referee> refList = new ArrayList<>(
-                List.of(new Referee(1), new Referee(2))
+        List<Doctor> doctorList = new ArrayList<>(
+                List.of(new Doctor(1), new Doctor(2))
         );
 
         // a user queue and a ref queue
-        LinkedList<User> waitingQue = new LinkedList<>();
-        LinkedList<Referee> refQue = new LinkedList<>();
-        refQue.addAll(refList);
-        LinkedList<Referee> processQue = new LinkedList<>();
+        LinkedList<Patient> waitingQue = new LinkedList<>();
+        LinkedList<Doctor> doctorQue = new LinkedList<>();
+        doctorQue.addAll(doctorList);
+        LinkedList<Doctor> processQue = new LinkedList<>();
 
         // a scheduled pool
-        ScheduledExecutorService userPool = Executors.newScheduledThreadPool(1);
-        ScheduledExecutorService refPool = Executors.newScheduledThreadPool(3);
-        ScheduledExecutorService processPool = Executors.newScheduledThreadPool(2);
+        ScheduledExecutorService patientThreadPool = Executors.newScheduledThreadPool(1);
+        ScheduledExecutorService doctorThreadPool = Executors.newScheduledThreadPool(3);
+        ScheduledExecutorService processThreadPool = Executors.newScheduledThreadPool(2);
 
-        userPool.scheduleAtFixedRate(() -> {
-            var user = userList.remove(0);
+        patientThreadPool.scheduleAtFixedRate(() -> {
+            var user = patientList.remove(0);
             synchronized (waitingQue) {
                 waitingQue.add(user);
                 System.out.println(
@@ -68,18 +68,18 @@ public class Main5 {
             }
         }, 0, 2* 1000, TimeUnit.MILLISECONDS);
 
-        refPool.scheduleAtFixedRate(()-> {
-            Referee ref = null;
+        doctorThreadPool.scheduleAtFixedRate(()-> {
+            Doctor ref = null;
             synchronized (waitingQue) {
-                System.out.println(Instant.now() + ": ref thread entered waiting queue and there are "
+                System.out.println(Instant.now() + ": doctor thread entered waiting queue and there are "
                         + waitingQue.size() + " waiting");
                 if (waitingQue.size() > 0) {
-                    synchronized (refQue) {
+                    synchronized (doctorQue) {
                         System.out.println(Instant.now() + ": ref thread entered ref queue and there are "
-                                + refQue.size() + " waiting");
-                        if (refQue.size() > 0) {
+                                + doctorQue.size() + " waiting");
+                        if (doctorQue.size() > 0) {
                             var user = waitingQue.removeFirst();
-                            ref = refQue.removeFirst();
+                            ref = doctorQue.removeFirst();
                             System.out.println(
                                     Instant.now() + ": User " + user.id + " is picked by Referee " + ref.id);
                         }
@@ -97,10 +97,10 @@ public class Main5 {
             }
         }, 10, 1*1000, TimeUnit.MILLISECONDS);
 
-        processPool.scheduleAtFixedRate(()-> {
-            List<Referee> finishedRef = new ArrayList<>();
-            synchronized (refQue) {
-                if (refQue.size() < 2) {
+        processThreadPool.scheduleAtFixedRate(()-> {
+            List<Doctor> finishedRef = new ArrayList<>();
+            synchronized (doctorQue) {
+                if (doctorQue.size() < 2) {
                     synchronized (processQue) {
                         Instant now = Instant.now();
                         for (var ref : processQue) {
@@ -111,15 +111,15 @@ public class Main5 {
                         }
                     }
                     System.out.println(Instant.now() + ": found " + finishedRef.size() + " refs finished verification");
-                    refQue.addAll(finishedRef);
+                    doctorQue.addAll(finishedRef);
                 }
             }
         }, 0, 1* 1000, TimeUnit.MILLISECONDS);
 
         Thread.sleep(30 * 1000);
-        userPool.shutdown();
-        refPool.shutdown();
-        processPool.shutdown();
+        patientThreadPool.shutdown();
+        doctorThreadPool.shutdown();
+        processThreadPool.shutdown();
     }
 
     public static void main(String[] args) throws InterruptedException {

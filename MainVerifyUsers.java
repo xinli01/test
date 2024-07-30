@@ -10,7 +10,6 @@
 // Follow up:
 // If the patient has priority, low priority number go first, if the priority are the same, the one waited longer has priority
 
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -48,7 +47,7 @@ public class Main5 {
                 List.of(new Doctor(1), new Doctor(2))
         );
 
-        // a user queue and a ref queue
+        // a patient queue and a doctor queue
         LinkedList<Patient> waitingQue = new LinkedList<>();
         LinkedList<Doctor> doctorQue = new LinkedList<>();
         doctorQue.addAll(doctorList);
@@ -60,58 +59,58 @@ public class Main5 {
         ScheduledExecutorService processThreadPool = Executors.newScheduledThreadPool(2);
 
         patientThreadPool.scheduleAtFixedRate(() -> {
-            var user = patientList.remove(0);
+            var patient = patientList.remove(0);
             synchronized (waitingQue) {
-                waitingQue.add(user);
+                waitingQue.add(patient);
                 System.out.println(
-                        Instant.now() + ": added User " + user.id + " and total users waiting are " + waitingQue.size());
+                        Instant.now() + ": added patient " + patient.id + " and total patients waiting are " + waitingQue.size());
             }
         }, 0, 2* 1000, TimeUnit.MILLISECONDS);
 
         doctorThreadPool.scheduleAtFixedRate(()-> {
-            Doctor ref = null;
+            Doctor doctor = null;
             synchronized (waitingQue) {
                 System.out.println(Instant.now() + ": doctor thread entered waiting queue and there are "
-                        + waitingQue.size() + " waiting");
+                        + waitingQue.size() + " patients waiting");
                 if (waitingQue.size() > 0) {
                     synchronized (doctorQue) {
-                        System.out.println(Instant.now() + ": ref thread entered ref queue and there are "
-                                + doctorQue.size() + " waiting");
+                        System.out.println(Instant.now() + ": doctor thread entered doctor queue and there are "
+                                + doctorQue.size() + " doctors waiting");
                         if (doctorQue.size() > 0) {
-                            var user = waitingQue.removeFirst();
-                            ref = doctorQue.removeFirst();
+                            var patient = waitingQue.removeFirst();
+                            doctor = doctorQue.removeFirst();
                             System.out.println(
-                                    Instant.now() + ": User " + user.id + " is picked by Referee " + ref.id);
+                                    Instant.now() + ": patient " + patient.id + " is picked by doctor " + doctor.id);
                         }
                     }
                 } else {
-                    System.out.println(Instant.now() + ": There is no user waiting.");
+                    System.out.println(Instant.now() + ": There is no patient waiting.");
                 }
             }
 
-            if (ref != null) {
+            if (doctor != null) {
                 synchronized (processQue) {
-                    ref.setTime();
-                    processQue.add(ref);
+                    doctor.setTime();
+                    processQue.add(doctor);
                 }
             }
         }, 10, 1*1000, TimeUnit.MILLISECONDS);
 
         processThreadPool.scheduleAtFixedRate(()-> {
-            List<Doctor> finishedRef = new ArrayList<>();
+            List<Doctor> idleDoctors = new ArrayList<>();
             synchronized (doctorQue) {
                 if (doctorQue.size() < 2) {
                     synchronized (processQue) {
                         Instant now = Instant.now();
-                        for (var ref : processQue) {
-                            if (ref.instantAddedToQue.plusSeconds(4).isBefore(now)) {
-                                processQue.remove(ref);
-                                finishedRef.add(ref);
+                        for (var doctor : processQue) {
+                            if (doctor.instantAddedToQue.plusSeconds(4).isBefore(now)) {
+                                processQue.remove(doctor);
+                                idleDoctors.add(doctor);
                             }
                         }
                     }
-                    System.out.println(Instant.now() + ": found " + finishedRef.size() + " refs finished verification");
-                    doctorQue.addAll(finishedRef);
+                    System.out.println(Instant.now() + ": found " + idleDoctors.size() + " doctors finished verification");
+                    doctorQue.addAll(idleDoctors);
                 }
             }
         }, 0, 1* 1000, TimeUnit.MILLISECONDS);
